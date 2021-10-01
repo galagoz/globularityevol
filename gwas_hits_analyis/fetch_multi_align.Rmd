@@ -16,15 +16,18 @@ library(rjson)
 ## R Markdown
 
 ```{r}
-lead_snps = read.table("/data/workspaces/lag/workspaces/lg-ukbiobank/projects/globularity/evolution/results/leadSNPs.txt", header = T)
+lead_snps = read.table("/data/workspaces/lag/workspaces/lg-ukbiobank/projects/globularity/evolution/results/VEP/globularity_lead_snps_VEP_GRCh38.txt", header = T)
 
 # remove multi-allelic SNPs
-lead_snps_1 = lead_snps[str_detect(lead_snps$rsID, "rs"), ]
+#lead_snps_1 = lead_snps[str_detect(lead_snps$rsID, "rs"), ]
 
 outDir = "/data/workspaces/lag/workspaces/lg-ukbiobank/projects/globularity/evolution/results/phylogenetic_context/multiple_seq_alignments/"
 
 ```
 
+## SNP list liftover (GRCh37 -> GRCh38)
+# SNPs from Globularity GWAS are in GRCh37, Ensembl phylogenetic context works for GRCh38 coordinates. So, convert all SNPs to GRCh37 first.
+# Do this using Crossap from Ensembl, which works on Python.
 
 ```{r fetch_seqs_100bp}
 
@@ -53,7 +56,7 @@ for (i in 1:length(lead_snps_1$rsID)) {
   else {
   species_tree = json_object$tree
   
-  m = matrix(NA, nrow = length(jason_object$alignments), ncol = 6)
+  m = matrix(NA, nrow = length(json_object$alignments), ncol = 6)
   tmp_df = as.data.frame(m)
   colnames(tmp_df) = c("species", 
                        "chr", 
@@ -93,16 +96,16 @@ for (i in 1:length(lead_snps_1$rsID)) {
 
 ```
 
-## Including Plots
+## +-10bp
 
 ```{r fetch_seqs_10bp}
-for (i in 1:length(lead_snps_1$rsID)) {
-  #i=1
-  tmp_rsID = lead_snps_1$rsID[i]
-  tmp_chr = lead_snps_1$chr[i]
+for (i in 1:length(lead_snps$rsID)) {
+  #i=2
+  tmp_rsID = lead_snps$ID[i]
+  tmp_chr = lead_snps$CHROM[i]
   # extract the region covering +-100bp of the variant
-  tmp_seq_str = lead_snps_1$pos[i]-10
-  tmp_seq_end = lead_snps_1$pos[i]+10
+  tmp_seq_str = lead_snps$POS[i]-10
+  tmp_seq_end = lead_snps$POS[i]+10
   
   server <- "http://rest.ensembl.org"
   ext <- paste0("/alignment/region/homo_sapiens/", tmp_chr, ":", tmp_seq_str, "-", 
@@ -117,11 +120,12 @@ for (i in 1:length(lead_snps_1$rsID)) {
   #head(fromJSON(toJSON(content(r))))
   json_object = fromJSON(toJSON(content(r)))[[1]]
   
-  if (json_object == "no alignment available for this region") {next}
-  else {
+  if (json_object == "no alignment available for this region") {
+    next
+    } else {
   species_tree = json_object$tree
   
-  m = matrix(NA, nrow = length(jason_object$alignments), ncol = 2)
+  m = matrix(NA, nrow = length(json_object$alignments), ncol = 2)
   tmp_df = as.data.frame(m)
   colnames(tmp_df) = c("species", 
                        "seq")
@@ -142,11 +146,11 @@ for (i in 1:length(lead_snps_1$rsID)) {
     
   }
 
-  write.table(tmp_df, file = paste0(outDir, tmp_rsID, "_10bp.tab"),
-                row.names = FALSE, quote = FALSE, sep = "\t")
+  #write.table(tmp_df, file = paste0(outDir, tmp_rsID, "_10bp.tab"),
+  #              row.names = FALSE, quote = FALSE, sep = "\t")
 
-  write.table(species_tree, file = paste0(outDir, tmp_rsID, "_10bp_tree.txt"),
-                row.names = FALSE, quote = FALSE)
+  #write.table(species_tree, file = paste0(outDir, tmp_rsID, "_10bp_tree.txt"),
+  #              row.names = FALSE, quote = FALSE)
   
   }
 }

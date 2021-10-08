@@ -16,10 +16,10 @@ library(rjson)
 ## R Markdown
 
 ```{r}
-lead_snps = read.table("/data/workspaces/lag/workspaces/lg-ukbiobank/projects/globularity/evolution/results/VEP/globularity_lead_snps_VEP_GRCh38.txt", header = T)
+lead_snps = read.table("/data/workspaces/lag/workspaces/lg-ukbiobank/projects/globularity/evolution/results/VEP/globularity_lead_snps_VEP.txt", header = T)
 
-# remove multi-allelic SNPs
-#lead_snps_1 = lead_snps[str_detect(lead_snps$rsID, "rs"), ]
+# remove SNPs that are mapped to patches
+lead_snps = lead_snps[!str_detect(lead_snps$Location, "CHR"), ]
 
 outDir = "/data/workspaces/lag/workspaces/lg-ukbiobank/projects/globularity/evolution/results/phylogenetic_context/multiple_seq_alignments/"
 
@@ -31,13 +31,16 @@ outDir = "/data/workspaces/lag/workspaces/lg-ukbiobank/projects/globularity/evol
 
 ```{r fetch_seqs_100bp}
 
-for (i in 1:length(lead_snps_1$rsID)) {
-  #i=1
-  tmp_rsID = lead_snps_1$rsID[i]
-  tmp_chr = lead_snps_1$chr[i]
+for (i in unique(lead_snps$Uploaded_variation)) {
+  #i=2
+  #i="rs74594184"
+  tmp_rsID = i
+  tmp_loc = lead_snps[lead_snps$Uploaded_variation==i,]$Location[1]
   # extract the region covering +-100bp of the variant
-  tmp_seq_str = lead_snps_1$pos[i]-100
-  tmp_seq_end = lead_snps_1$pos[i]+100
+  tmp_chr = strsplit(tmp_loc, split = ":")[[1]][1]
+  tmp_pos = as.numeric(strsplit(strsplit(tmp_loc, split = ":")[[1]][2], split = "-")[[1]][1])
+  tmp_seq_str = tmp_pos-100
+  tmp_seq_end = tmp_pos+100
   
   server <- "http://rest.ensembl.org"
   ext <- paste0("/alignment/region/homo_sapiens/", tmp_chr, ":", tmp_seq_str, "-", 
@@ -47,14 +50,24 @@ for (i in 1:length(lead_snps_1$rsID)) {
   #r <- GET(paste(server, ext, sep = ""), content_type(".xml"))
   #stop_for_status(r)
  
-  # use this if you get a simple nested list back, otherwise inspect its structure
-  # head(data.frame(t(sapply(content(r),c))))
-  #head(fromJSON(toJSON(content(r))))
-  json_object = fromJSON(toJSON(content(r)))[[1]]
+  # Some of the variants fall within regions that are missing in non-human ape genome assemblies. 
+  # Get their alignment (with species that have DNAseq data from those regions) from the Ensembl 
+  # browser manually.
+  #result = class(try(toJSON(content(r)), silent = T))
   
-  if (json_object == "no alignment available for this region") {next}
-  else {
-  species_tree = json_object$tree
+  if (class(try(toJSON(content(r)), silent = T)) == "try-error") {
+    print(paste("Manually check:", tmp_rsID))
+    next
+  } 
+  else if (fromJSON(toJSON(content(r)))[[1]] == "no alignment available for this region") {
+    print(paste("Manually check:", tmp_rsID))
+    next
+  } else {
+  
+    json_object = fromJSON(toJSON(content(r)))[[1]]
+    species_tree = json_object$tree
+  
+  # Create a df to fill with data from Ensembl
   
   m = matrix(NA, nrow = length(json_object$alignments), ncol = 6)
   tmp_df = as.data.frame(m)
@@ -65,13 +78,77 @@ for (i in 1:length(lead_snps_1$rsID)) {
                        "strand", 
                        "seq")
   
-  #tmp_df = data.frame(species = character(), 
-  #                    chr = character(), 
-  #                    seq_str = character(), 
-  #                    seq_end = character(), 
-  #                    strand = character(), 
-  #                    seq = character())
+    # loop over extant species and ancestors
+  for (j in 1:length(json_object$alignments)) {
+    #j=1
+    
+    tmp_df$species[j] = json_object$alignments[[j]]$species
+    tmp_df$chr[j] = tmp_chr
+    tmp_df$seq_str[j] = json_object$alignments[[j]]$start
+    tmp_df$seq_end[j] = json_object$alignments[[j]]$end
+    tmp_df$strand[j] = json_object$alignments[[j]]$strand
+    tmp_df$seq[j] = json_object$alignments[[j]]$seq
+    
+  }
 
+  write.table(tmp_df, file = paste0(outDir, "100bp/", tmp_rsID, ".tab"),
+                row.names = FALSE, quote = FALSE, sep = "\t")
+
+  write.table(species_tree, file = paste0(outDir, "100bp/", tmp_rsID, "_tree.txt"),
+                row.names = FALSE, quote = FALSE)
+  
+  }
+}
+
+```
+
+## +-10bp
+
+```{r fetch_seqs_10bp}
+for (i in unique(lead_snps$Uploaded_variation)) {
+  #i=2
+  tmp_rsID = i
+  tmp_loc = lead_snps[lead_snps$Uploaded_variation==i,]$Location[1]
+  # extract the region covering +-100bp of the variant
+  tmp_chr = strsplit(tmp_loc, split = ":")[[1]][1]
+  tmp_pos = as.numeric(strsplit(strsplit(tmp_loc, split = ":")[[1]][2], split = "-")[[1]][1])
+  tmp_seq_str = tmp_pos-10
+  tmp_seq_end = tmp_pos+10
+  
+  server <- "http://rest.ensembl.org"
+  ext <- paste0("/alignment/region/homo_sapiens/", tmp_chr, ":", tmp_seq_str, "-", 
+                tmp_seq_end, "?species_set_group=primates")
+
+  r <- GET(paste(server, ext, sep = ""), content_type("application/json"))
+  #r <- GET(paste(server, ext, sep = ""), content_type(".xml"))
+  #stop_for_status(r)
+ 
+   # Some of the variants fall within regions that are missing in non-human ape genome assemblies. 
+  # Get their alignment (with species that have DNAseq data from those regions) from the Ensembl 
+  # browser manually.
+  #result = class(try(toJSON(content(r)), silent = T))
+  
+  if (class(try(toJSON(content(r)), silent = T)) == "try-error") {
+    print(paste("Manually check:", tmp_rsID))
+    next
+  } 
+  else if (fromJSON(toJSON(content(r)))[[1]] == "no alignment available for this region") {
+    print(paste("Manually check:", tmp_rsID))
+    next
+  } else {
+    
+    json_object = fromJSON(toJSON(content(r)))[[1]]
+    species_tree = json_object$tree
+  
+  m = matrix(NA, nrow = length(json_object$alignments), ncol = 6)
+  tmp_df = as.data.frame(m)
+  colnames(tmp_df) = c("species", 
+                       "chr", 
+                       "seq_str", 
+                       "seq_end",  
+                       "strand", 
+                       "seq")
+  
   # loop over extant species and ancestors
   for (j in 1:length(json_object$alignments)) {
     #j=1
@@ -85,72 +162,11 @@ for (i in 1:length(lead_snps_1$rsID)) {
     
   }
 
-  write.table(tmp_df, file = paste0(outDir, tmp_rsID, ".tab"),
+  write.table(tmp_df, file = paste0(outDir, "10bp/", tmp_rsID, "_10bp.tab"),
                 row.names = FALSE, quote = FALSE, sep = "\t")
 
-  write.table(species_tree, file = paste0(outDir, tmp_rsID, "_tree.txt"),
+  write.table(species_tree, file = paste0(outDir, "10bp/", tmp_rsID, "_10bp_tree.txt"),
                 row.names = FALSE, quote = FALSE)
-  
-  }
-}
-
-```
-
-## +-10bp
-
-```{r fetch_seqs_10bp}
-for (i in 1:length(lead_snps$rsID)) {
-  #i=2
-  tmp_rsID = lead_snps$ID[i]
-  tmp_chr = lead_snps$CHROM[i]
-  # extract the region covering +-100bp of the variant
-  tmp_seq_str = lead_snps$POS[i]-10
-  tmp_seq_end = lead_snps$POS[i]+10
-  
-  server <- "http://rest.ensembl.org"
-  ext <- paste0("/alignment/region/homo_sapiens/", tmp_chr, ":", tmp_seq_str, "-", 
-                tmp_seq_end, "?species_set_group=primates")
-
-  r <- GET(paste(server, ext, sep = ""), content_type("application/json"))
-  #r <- GET(paste(server, ext, sep = ""), content_type(".xml"))
-  #stop_for_status(r)
- 
-  # use this if you get a simple nested list back, otherwise inspect its structure
-  # head(data.frame(t(sapply(content(r),c))))
-  #head(fromJSON(toJSON(content(r))))
-  json_object = fromJSON(toJSON(content(r)))[[1]]
-  
-  if (json_object == "no alignment available for this region") {
-    next
-    } else {
-  species_tree = json_object$tree
-  
-  m = matrix(NA, nrow = length(json_object$alignments), ncol = 2)
-  tmp_df = as.data.frame(m)
-  colnames(tmp_df) = c("species", 
-                       "seq")
-  
-  #tmp_df = data.frame(species = character(), 
-  #                    chr = character(), 
-  #                    seq_str = character(), 
-  #                    seq_end = character(), 
-  #                    strand = character(), 
-  #                    seq = character())
-
-  # loop over extant species and ancestors
-  for (j in 1:length(json_object$alignments)) {
-    #j=1
-    
-    tmp_df$species[j] = json_object$alignments[[j]]$species
-    tmp_df$seq[j] = json_object$alignments[[j]]$seq
-    
-  }
-
-  #write.table(tmp_df, file = paste0(outDir, tmp_rsID, "_10bp.tab"),
-  #              row.names = FALSE, quote = FALSE, sep = "\t")
-
-  #write.table(species_tree, file = paste0(outDir, tmp_rsID, "_10bp_tree.txt"),
-  #              row.names = FALSE, quote = FALSE)
   
   }
 }

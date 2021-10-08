@@ -10,7 +10,7 @@ library(stringr)
 library(httr)
 library(jsonlite)
 library(xml2)
-library(rjson)
+library(ape)
 ```
 
 ## R Markdown
@@ -173,30 +173,20 @@ for (i in unique(lead_snps$Uploaded_variation)) {
 ```
 
 ```{r}
-library(ape)
+
 x <- read.tree(text = read.table("/data/workspaces/lag/workspaces/lg-ukbiobank/projects/globularity/evolution/results/phylogenetic_context/multiple_seq_alignments/10bp/rs755576_10bp_tree.txt")[1,1])
 
- foo <- function() {
- col <- "green"
- for (i in 1:2)
- axis(i, col = col, col.ticks = col, col.axis = col, las = 1)
- box(lty = "19")
- }
+foo <- function() {
+col <- "green"
+for (i in 1:2)
+axis(i, col = col, col.ticks = col, col.axis = col, las = 1)
+box(lty = "19")
+}
 
- plot(x); foo()
-
-## lots of extra space in the margin for side 1
-op <- par(mar = c(18,4,4,2) + 0.1)
-plot(x, yaxt = "n")
-par(op) ## reset
-pdf("/data/workspaces/lag/workspaces/lg-ukbiobank/projects/globularity/evolution/results/phylogenetic_context/multiple_seq_alignments/10bp/rs755576_10bp_tree.pdf", width = 5, height = 15)
-plot(x, yaxt = "n")
+pdf("/data/workspaces/lag/workspaces/lg-ukbiobank/projects/globularity/evolution/results/phylogenetic_context/multiple_seq_alignments/10bp/rs755576_10bp_tree.pdf")
+plot(x); foo()
 dev.off()
 
-y <- read.dendrogram(text = read.table("/data/workspaces/lag/workspaces/lg-ukbiobank/projects/globularity/evolution/results/phylogenetic_context/multiple_seq_alignments/10bp/rs10841789_10bp_tree.txt", header = T)[1,1])
-p1 = plot(y, yaxt = "n")
-
-write.dendrogram(x, edges = FALSE)
 ```
 
 

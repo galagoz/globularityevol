@@ -15,7 +15,7 @@ library(ape)
 
 ## R Markdown
 
-```{r}
+```{r set_paths}
 lead_snps = read.table("/data/workspaces/lag/workspaces/lg-ukbiobank/projects/globularity/evolution/results/VEP/globularity_lead_snps_VEP.txt", header = T)
 
 # remove SNPs that are mapped to patches
@@ -172,21 +172,27 @@ for (i in unique(lead_snps$Uploaded_variation)) {
 }
 ```
 
+# Plot trees
+
 ```{r}
 
-x <- read.tree(text = read.table("/data/workspaces/lag/workspaces/lg-ukbiobank/projects/globularity/evolution/results/phylogenetic_context/multiple_seq_alignments/10bp/rs755576_10bp_tree.txt")[1,1])
-
 foo <- function() {
-col <- "green"
-for (i in 1:2)
-axis(i, col = col, col.ticks = col, col.axis = col, las = 1)
-box(lty = "19")
+  col <- "green"
+  for (i in 1:2)
+  axis(i, col = col, col.ticks = col, col.axis = col, las = 1)
+  box(lty = "19")
 }
 
-pdf("/data/workspaces/lag/workspaces/lg-ukbiobank/projects/globularity/evolution/results/phylogenetic_context/multiple_seq_alignments/10bp/rs755576_10bp_tree.pdf")
-plot(x); foo()
-dev.off()
-
+for (i in dir(paste0(outDir, "10bp"), pattern = "tree.txt", full.names = T)) {
+  
+  tmp_rsID = strsplit(strsplit(i, split = "_")[[1]][4], split = "/")[[1]][3]
+  x = read.tree(text = read.table(i, header = T)[1,1])
+  
+  pdf(paste0(outDir, "10bp/", tmp_rsID, "_10bp_tree.pdf"))
+  plot(x); foo()
+  dev.off()
+}
+#i=dir(paste0(outDir, "10bp"), pattern = "tree", full.names = T)[1]
 ```
 
 
